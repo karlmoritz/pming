@@ -179,10 +179,16 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
         if (p.startDate && p.targetDate) return p
         const isBacklog = p.state.type === 'backlog'
         if (isBacklog) {
+          const shiftDate = (base: string, months: number) => {
+            const d2 = parseDate(base)
+            return formatDate(new Date(Date.UTC(d2.getUTCFullYear(), d2.getUTCMonth() + months, d2.getUTCDate(), 12)))
+          }
+          const estStart = p.startDate ?? (p.targetDate ? shiftDate(p.targetDate, -2) : backlogStart)
+          const estEnd   = p.targetDate ?? (p.startDate ? shiftDate(p.startDate, 2) : backlogEnd)
           return {
             ...p,
-            startDate: p.startDate ?? backlogStart,
-            targetDate: p.targetDate ?? backlogEnd,
+            startDate: estStart,
+            targetDate: estEnd,
             estimatedDates: true,
             estimatedStart: !p.startDate,
             estimatedEnd: !p.targetDate,

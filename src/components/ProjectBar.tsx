@@ -129,15 +129,13 @@ export default function ProjectBar({
           timelineRange.startDate,
           pixelsPerDay
         )
-        if (!project.estimatedStart) {
-          onProjectChange({
-            projectId: project.id,
-            projectName: project.name,
-            field: 'startDate',
-            oldValue: project.startDate,
-            newValue: formatDate(newStartDate),
-          })
-        }
+        onProjectChange({
+          projectId: project.id,
+          projectName: project.name,
+          field: 'startDate',
+          oldValue: project.startDate,
+          newValue: formatDate(newStartDate),
+        })
       } else {
         // resize-end
         const snappedDelta = Math.round(delta / pixelsPerDay) * pixelsPerDay
@@ -146,15 +144,13 @@ export default function ProjectBar({
           timelineRange.startDate,
           pixelsPerDay
         )
-        if (!project.estimatedEnd) {
-          onProjectChange({
-            projectId: project.id,
-            projectName: project.name,
-            field: 'targetDate',
-            oldValue: project.targetDate,
-            newValue: formatDate(newEndDate),
-          })
-        }
+        onProjectChange({
+          projectId: project.id,
+          projectName: project.name,
+          field: 'targetDate',
+          oldValue: project.targetDate,
+          newValue: formatDate(newEndDate),
+        })
       }
 
       dragRef.current = null
@@ -180,7 +176,6 @@ export default function ProjectBar({
   }
 
   function handleResizeStartMouseDown(e: React.MouseEvent) {
-    if (project.estimatedStart) return
     e.preventDefault()
     e.stopPropagation()
     setShowTooltip(false)
@@ -189,7 +184,6 @@ export default function ProjectBar({
   }
 
   function handleResizeEndMouseDown(e: React.MouseEvent) {
-    if (project.estimatedEnd) return
     e.preventDefault()
     e.stopPropagation()
     setShowTooltip(false)
@@ -259,7 +253,7 @@ export default function ProjectBar({
           className="project-bar-resize project-bar-resize--start"
           style={{
             backgroundColor: resizeHandleColor,
-            cursor: project.estimatedStart ? 'default' : undefined,
+            cursor: undefined,
           }}
           onMouseDown={handleResizeStartMouseDown}
         />
@@ -270,7 +264,7 @@ export default function ProjectBar({
           className="project-bar-resize project-bar-resize--end"
           style={{
             backgroundColor: resizeHandleColor,
-            cursor: project.estimatedEnd ? 'default' : undefined,
+            cursor: undefined,
           }}
           onMouseDown={handleResizeEndMouseDown}
         />
