@@ -13,6 +13,7 @@ import {
   calcTimelineRange,
   getQuartersInRange,
   getMonthsInRange,
+  getWeeksInRange,
   getYearsInRange,
   getDaysInRange,
   addQuarters,
@@ -24,7 +25,7 @@ import {
 import SwimlaneComponent from './SwimlaneComponent'
 import MilestoneMarker from './MilestoneMarker'
 
-type HeaderMode = 'year' | 'quarter' | 'month' | 'day'
+type HeaderMode = 'year' | 'quarter' | 'month' | 'week' | 'day'
 
 interface RoadmapCanvasProps {
   projects: LinearProject[]
@@ -121,7 +122,7 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
         if (!e.ctrlKey && !e.metaKey) return
         e.preventDefault()
         e.stopPropagation()
-        const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12
+        const factor = e.deltaY < 0 ? 1.06 : 1 / 1.06
         const rect = el!.getBoundingClientRect()
         const anchorX = e.clientX - rect.left
         const absX = el!.scrollLeft + anchorX
@@ -137,8 +138,9 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
 
     const headerMode: HeaderMode =
       ppd >= 18  ? 'day'
-      : ppd >= 7  ? 'month'
-      : ppd >= 2.5 ? 'quarter'
+      : ppd >= 7  ? 'week'
+      : ppd >= 2.5 ? 'month'
+      : ppd >= 1  ? 'quarter'
       : 'year'
 
     const displayProjects = useMemo(
@@ -161,6 +163,7 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
 
     const quarters = useMemo(() => getQuartersInRange(timelineRange), [timelineRange])
     const months = useMemo(() => getMonthsInRange(timelineRange), [timelineRange])
+    const weeks = useMemo(() => getWeeksInRange(timelineRange), [timelineRange])
     const years = useMemo(() => getYearsInRange(timelineRange), [timelineRange])
     const days = useMemo(() => getDaysInRange(timelineRange), [timelineRange])
 
@@ -297,6 +300,19 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
           )
         })
       }
+      if (headerMode === 'week') {
+        const msPerDay = 86400000
+        return weeks.map((w, i) => {
+          const cellStart = w.startDate < timelineRange.startDate ? timelineRange.startDate : w.startDate
+          const nextStart = weeks[i + 1]?.startDate ?? new Date(w.startDate.getTime() + 7 * msPerDay)
+          const w_px = daysBetween(cellStart, nextStart) * ppd
+          return (
+            <div key={i} className="header-cell header-cell-minor" style={{ width: w_px, minWidth: w_px }}>
+              {w_px >= 30 ? w.label : ''}
+            </div>
+          )
+        })
+      }
       if (headerMode === 'month') {
         return null
       }
@@ -312,7 +328,7 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
       ))
     }
 
-    const showMinorRow = headerMode !== 'month'
+    const showMinorRow = true
 
     // ── Grid lines in body ────────────────────────────────────────
     const majorGridDates =
@@ -321,7 +337,13 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
       : months.map((m) => m.startDate)
 
     const minorGridDates =
-      headerMode === 'quarter' ? months.map((m) => m.startDate) : []
+      headerMode === 'quarter' ? months.map((m) => m.startDate)
+      : headerMode === 'month' ? months.map((m) => m.startDate)
+      : []
+
+    // Week grid lines: shown in week mode, and faintly in month mode when there's enough space
+    const weekGridDates =
+      headerMode !== 'day' && ppd >= 3.5 ? weeks.map((w) => w.startDate) : []
 
     const dayGridDates =
       headerMode === 'day' ? days.map((d) => d.date) : []
@@ -354,19 +376,25 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
             <div className="canvas-body" ref={bodyRef}>
               {/* Major grid lines */}
               {majorGridDates.map((d, i) => {
-                const x = dateToX(d, timelineRange.startDate, ppd) + LABEL_WIDTH
+                const x = dateToX(d, timelineRange.startDate, ppd) + LABEL_WIDTH - 1
                 return <div key={`major-${i}`} className="quarter-gridline" style={{ left: x }} />
               })}
 
               {/* Minor (faint) grid lines — months within quarters */}
               {minorGridDates.map((d, i) => {
-                const x = dateToX(d, timelineRange.startDate, ppd) + LABEL_WIDTH
+                const x = dateToX(d, timelineRange.startDate, ppd) + LABEL_WIDTH - 1
                 return <div key={`minor-${i}`} className="month-gridline" style={{ left: x }} />
+              })}
+
+              {/* Week grid lines */}
+              {weekGridDates.map((d, i) => {
+                const x = dateToX(d, timelineRange.startDate, ppd) + LABEL_WIDTH - 1
+                return <div key={`week-${i}`} className="week-gridline" style={{ left: x }} />
               })}
 
               {/* Day grid lines */}
               {dayGridDates.map((d, i) => {
-                const x = dateToX(d, timelineRange.startDate, ppd) + LABEL_WIDTH
+                const x = dateToX(d, timelineRange.startDate, ppd) + LABEL_WIDTH - 1
                 return <div key={`day-${i}`} className="day-gridline" style={{ left: x }} />
               })}
 

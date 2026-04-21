@@ -33,9 +33,10 @@ interface ToolbarProps {
 }
 
 function granularityLabel(ppd: number): string {
-  if (ppd >= 18) return 'Days'
-  if (ppd >= 7)  return 'Months'
-  if (ppd >= 2.5) return 'Quarters'
+  if (ppd >= 18)  return 'Days'
+  if (ppd >= 7)   return 'Weeks'
+  if (ppd >= 2.5) return 'Months'
+  if (ppd >= 1)   return 'Quarters'
   return 'Years'
 }
 
