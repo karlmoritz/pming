@@ -6,6 +6,7 @@ import type {
   Milestone,
   PendingChange,
   TimelineRange,
+  Team,
 } from '../types'
 import { buildSwimlanes } from '../utils/swimlanes'
 import {
@@ -28,6 +29,7 @@ type HeaderMode = 'year' | 'quarter' | 'month' | 'day'
 interface RoadmapCanvasProps {
   projects: LinearProject[]
   initiatives: Initiative[]
+  teams: Team[]
   swimlaneMode: SwimlaneMode
   milestones: Milestone[]
   pendingChanges: PendingChange[]
@@ -75,6 +77,7 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
     {
       projects,
       initiatives,
+      teams,
       swimlaneMode,
       milestones,
       pendingChanges,
@@ -173,7 +176,7 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
     }, [filteredProjects])
 
     const swimlanes = useMemo(
-      () => buildSwimlanes(projectedProjects, swimlaneMode, initiatives, hiddenLabelIds),
+      () => buildSwimlanes(projectedProjects, swimlaneMode, initiatives, hiddenLabelIds, teams),
       [projectedProjects, swimlaneMode, initiatives, hiddenLabelIds]
     )
 

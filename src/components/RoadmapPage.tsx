@@ -17,8 +17,22 @@ interface RoadmapPageProps {
   onToggleTheme: () => void
 }
 
+function readUrlTeamIds(): string[] {
+  const params = new URLSearchParams(window.location.search)
+  const raw = params.get('teams')
+  return raw ? raw.split(',').filter(Boolean) : []
+}
+
+function readUrlSwimlaneMode(): SwimlaneMode | null {
+  const params = new URLSearchParams(window.location.search)
+  const raw = params.get('mode')
+  if (raw === 'initiative' || raw === 'label' || raw === 'team') return raw
+  return null
+}
+
 export default function RoadmapPage({ apiKey, onLogout, theme, onToggleTheme }: RoadmapPageProps) {
-  const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>([])
+  const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>(readUrlTeamIds)
+  const [localSwimlaneMode, setLocalSwimlaneMode] = useState<SwimlaneMode | null>(readUrlSwimlaneMode)
   const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([])
   const [showMilestonePanel, setShowMilestonePanel] = useState(false)
   const [showSyncPanel, setShowSyncPanel] = useState(false)
@@ -36,6 +50,35 @@ export default function RoadmapPage({ apiKey, onLogout, theme, onToggleTheme }: 
     apiKey,
     selectedTeamIds[0]
   )
+
+  // Once config loads, adopt its swimlane mode if URL didn't specify one
+  useEffect(() => {
+    if (config && localSwimlaneMode === null) {
+      setLocalSwimlaneMode(config.swimlaneMode)
+    }
+  }, [config, localSwimlaneMode])
+
+  // Sync selectedTeamIds and swimlaneMode to URL (replaceState — no history entries)
+  const effectiveSwimlaneMode: SwimlaneMode = localSwimlaneMode ?? 'initiative'
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (selectedTeamIds.length > 0) {
+      params.set('teams', selectedTeamIds.join(','))
+    } else {
+      params.delete('teams')
+    }
+    if (effectiveSwimlaneMode !== 'initiative') {
+      params.set('mode', effectiveSwimlaneMode)
+    } else {
+      params.delete('mode')
+    }
+    const search = params.toString()
+    window.history.replaceState(
+      null,
+      '',
+      search ? `${window.location.pathname}?${search}` : window.location.pathname
+    )
+  }, [selectedTeamIds, effectiveSwimlaneMode])
 
   useEffect(() => {
     if (error) setBannerError(error)
@@ -60,9 +103,10 @@ export default function RoadmapPage({ apiKey, onLogout, theme, onToggleTheme }: 
   }
 
   function handleSwimlaneModeChange(mode: SwimlaneMode) {
-    if (!config) return
-    const newConfig: RoadmapConfig = { ...config, swimlaneMode: mode }
-    void saveConfig(newConfig)
+    setLocalSwimlaneMode(mode)
+    if (config) {
+      void saveConfig({ ...config, swimlaneMode: mode })
+    }
   }
 
   function handleTeamToggle(id: string) {
@@ -121,7 +165,7 @@ export default function RoadmapPage({ apiKey, onLogout, theme, onToggleTheme }: 
         selectedTeamIds={selectedTeamIds}
         onTeamToggle={handleTeamToggle}
         onClearTeams={handleClearTeams}
-        swimlaneMode={effectiveConfig.swimlaneMode}
+        swimlaneMode={effectiveSwimlaneMode}
         onSwimlaneModeChange={handleSwimlaneModeChange}
         currentPpd={displayPpd}
         onZoomIn={() => canvasRef.current?.zoomIn()}
@@ -162,7 +206,8 @@ export default function RoadmapPage({ apiKey, onLogout, theme, onToggleTheme }: 
           ref={canvasRef}
           projects={projects}
           initiatives={initiatives}
-          swimlaneMode={effectiveConfig.swimlaneMode}
+          teams={teams}
+          swimlaneMode={effectiveSwimlaneMode}
           milestones={effectiveConfig.milestones}
           pendingChanges={pendingChanges}
           onProjectChange={handleProjectChange}

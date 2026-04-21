@@ -145,15 +145,15 @@ export default function Toolbar({
           By Label
         </button>
         <button
-          className={currentMode === 'label+initiative' ? 'active' : ''}
-          onClick={() => onSwimlaneModeChange('label+initiative')}
+          className={currentMode === 'team' ? 'active' : ''}
+          onClick={() => onSwimlaneModeChange('team')}
         >
-          Label + Init
+          By Team
         </button>
       </div>
 
-      {/* Label filter — only visible in label-based modes */}
-      {(currentMode === 'label' || currentMode === 'label+initiative') && (
+      {/* Label filter — only visible in label mode */}
+      {currentMode === 'label' && (
         <>
           <div className="toolbar-divider" />
           <LabelFilterDropdown

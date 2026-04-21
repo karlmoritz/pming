@@ -1,17 +1,18 @@
-import type { LinearProject, Swimlane, SwimlaneMode, Initiative } from '../types'
+import type { LinearProject, Swimlane, SwimlaneMode, Initiative, Team } from '../types'
 
 export function buildSwimlanes(
   projects: LinearProject[],
   mode: SwimlaneMode,
   initiatives: Initiative[],
-  hiddenLabelIds: string[] = []
+  hiddenLabelIds: string[] = [],
+  teams: Team[] = []
 ): Swimlane[] {
   if (mode === 'initiative') {
     return buildByInitiative(projects, initiatives)
   } else if (mode === 'label') {
     return buildByLabel(projects, hiddenLabelIds)
   } else {
-    return buildByLabelAndInitiative(projects, initiatives, hiddenLabelIds)
+    return buildByTeam(projects, teams)
   }
 }
 
@@ -72,46 +73,25 @@ function buildByLabel(projects: LinearProject[], hiddenLabelIds: string[]): Swim
   return [...named, ...fallback]
 }
 
-// Each project appears once per (label × initiative) combination it belongs to.
-function buildByLabelAndInitiative(
-  projects: LinearProject[],
-  _initiatives: Initiative[],
-  hiddenLabelIds: string[]
-): Swimlane[] {
+// Each project appears once per team it belongs to.
+function buildByTeam(projects: LinearProject[], teams: Team[]): Swimlane[] {
   const map = new Map<string, Swimlane>()
 
   for (const project of projects) {
-    const labels = project.labels.length > 0 ? project.labels : [null]
-    const init = project.initiative ?? null
-
-    for (const label of labels) {
-      const labelId = label ? label.id : '__no_label__'
-      if (hiddenLabelIds.includes(labelId)) continue
-
-      const labelName = label ? label.name : 'No Label'
-      const initName = init ? init.name : 'No Initiative'
-      const initId = init ? init.id : '__no_init__'
-      const key = `${labelId}|${initId}`
-
-      if (!map.has(key)) {
-        map.set(key, {
-          id: key,
-          label: `${labelName} · ${initName}`,
-          color: init?.color ?? label?.color,
+    for (const teamId of project.teamIds) {
+      if (!map.has(teamId)) {
+        const team = teams.find((t) => t.id === teamId)
+        map.set(teamId, {
+          id: teamId,
+          label: team?.name ?? teamId,
           projects: [],
         })
       }
-      map.get(key)!.projects.push(project)
+      map.get(teamId)!.projects.push(project)
     }
   }
 
-  const named: Swimlane[] = []
-  const fallback: Swimlane[] = []
-  for (const [key, sw] of map) {
-    ;(key.startsWith('__no_label__|__no_init__') ? fallback : named).push(sw)
-  }
-  named.sort((a, b) => a.label.localeCompare(b.label))
-  return [...named, ...fallback]
+  return [...map.values()].sort((a, b) => a.label.localeCompare(b.label))
 }
 
 // Collect all unique labels across a project list (for the filter UI)

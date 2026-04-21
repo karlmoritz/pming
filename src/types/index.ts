@@ -40,7 +40,7 @@ export interface LinearProject {
   color?: string
 }
 
-export type SwimlaneMode = 'initiative' | 'label' | 'label+initiative'
+export type SwimlaneMode = 'initiative' | 'label' | 'team'
 
 export interface Milestone {
   id: string
