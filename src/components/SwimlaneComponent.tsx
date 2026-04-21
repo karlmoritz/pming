@@ -1,4 +1,4 @@
-import type { Swimlane, TimelineRange, PendingChange } from '../types'
+import type { Swimlane, TimelineRange, PendingChange, Team } from '../types'
 import { packProjects } from '../utils/packing'
 import ProjectBar from './ProjectBar'
 
@@ -6,6 +6,7 @@ interface SwimlaneProps {
   swimlane: Swimlane
   timelineRange: TimelineRange
   pixelsPerDay: number
+  teams: Team[]
   onProjectChange: (change: PendingChange) => void
 }
 
@@ -13,6 +14,7 @@ export default function SwimlaneComponent({
   swimlane,
   timelineRange,
   pixelsPerDay,
+  teams,
   onProjectChange,
 }: SwimlaneProps) {
   const rows = packProjects(swimlane.projects)
@@ -36,6 +38,7 @@ export default function SwimlaneComponent({
                 project={project}
                 timelineRange={timelineRange}
                 pixelsPerDay={pixelsPerDay}
+                teams={teams}
                 onProjectChange={onProjectChange}
               />
             ))}

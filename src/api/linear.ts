@@ -190,7 +190,7 @@ export async function fetchProjects(teamIds: string[] = []): Promise<LinearProje
     `, { filter, after: cursor })
 
     const mapped = data.projects.nodes
-      .filter((p: ProjectNode) => p.state !== 'completed' && p.state !== 'cancelled')
+      .filter((p: ProjectNode) => p.state !== 'completed' && p.state !== 'canceled')
       .map((p: ProjectNode) => ({
         id: p.id,
         name: p.name,

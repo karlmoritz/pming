@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
-import type { LinearProject, TimelineRange, PendingChange } from '../types'
+import type { LinearProject, TimelineRange, PendingChange, Team } from '../types'
 import { dateToX, xToDate, formatDate, parseDate } from '../utils/timeline'
 
 interface ProjectBarProps {
   project: LinearProject
   timelineRange: TimelineRange
   pixelsPerDay: number
+  teams: Team[]
   onProjectChange: (change: PendingChange) => void
 }
 
@@ -45,6 +46,7 @@ export default function ProjectBar({
   project,
   timelineRange,
   pixelsPerDay,
+  teams,
   onProjectChange,
 }: ProjectBarProps) {
   const dragRef = useRef<DragState | null>(null)
@@ -267,8 +269,18 @@ export default function ProjectBar({
           <div className="project-tooltip-title">{project.name}</div>
           {project.initiative && (
             <div className="project-tooltip-row">
-              <span className="project-tooltip-label">Init:</span>
+              <span className="project-tooltip-label">Initiative:</span>
               <span className="project-tooltip-value">{project.initiative.name}</span>
+            </div>
+          )}
+          {project.teamIds.length > 0 && (
+            <div className="project-tooltip-row">
+              <span className="project-tooltip-label">{project.teamIds.length === 1 ? 'Team:' : 'Teams:'}</span>
+              <span className="project-tooltip-value">
+                {project.teamIds
+                  .map((id) => teams.find((t) => t.id === id)?.name ?? id)
+                  .join(', ')}
+              </span>
             </div>
           )}
           <div className="project-tooltip-row">
