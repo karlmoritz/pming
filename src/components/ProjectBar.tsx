@@ -223,17 +223,32 @@ export default function ProjectBar({
 
   const bgColor = isPaused ? `${barColor}88` : barColor
   const resizeHandleColor = darken(barColor, 0.25)
-  const isEstimated = project.estimatedDates === true
+  const isBacklogEstimated = project.estimatedDates === true
+
+  // Gradient mask for ongoing projects with one or both edges estimated
+  let edgeMask: string | undefined
+  if (!isBacklogEstimated && (project.estimatedStart || project.estimatedEnd)) {
+    const f = '28px'
+    if (project.estimatedStart && project.estimatedEnd) {
+      edgeMask = `linear-gradient(to right, transparent, black ${f}, black calc(100% - ${f}), transparent)`
+    } else if (project.estimatedStart) {
+      edgeMask = `linear-gradient(to right, transparent, black ${f})`
+    } else {
+      edgeMask = `linear-gradient(to left, transparent, black ${f})`
+    }
+  }
 
   return (
     <>
       <div
-        className={`project-bar${isDragging ? ' dragging' : ''}${isEstimated ? ' estimated' : ''}`}
+        className={`project-bar${isDragging ? ' dragging' : ''}${isBacklogEstimated ? ' estimated' : ''}`}
         style={{
           left: currentLeft,
           width: currentWidth,
           backgroundColor: bgColor,
-          opacity: isCancelledOrCompleted ? 0.5 : isEstimated ? 0.55 : 1,
+          opacity: isCancelledOrCompleted ? 0.5 : isBacklogEstimated ? 0.55 : 1,
+          WebkitMaskImage: edgeMask,
+          maskImage: edgeMask,
         }}
         onMouseDown={handleBodyMouseDown}
         onMouseEnter={handleMouseEnter}

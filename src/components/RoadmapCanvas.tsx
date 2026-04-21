@@ -164,14 +164,38 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
     const years = useMemo(() => getYearsInRange(timelineRange), [timelineRange])
     const days = useMemo(() => getDaysInRange(timelineRange), [timelineRange])
 
-    // Projects with missing dates get estimated display dates (today ± 3 months)
+    // Projects with missing dates get estimated display dates.
+    // Backlog: +3m start, +6m end (fully shaded).
+    // Ongoing: -1m start if missing, +3m end if missing (gradient edge only).
     const projectedProjects = useMemo(() => {
       const d = new Date()
-      const defaultStart = formatDate(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 3, d.getUTCDate(), 12)))
-      const defaultEnd   = formatDate(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 3, d.getUTCDate(), 12)))
+      const shift = (months: number) =>
+        formatDate(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, d.getUTCDate(), 12)))
+      const backlogStart = shift(3)
+      const backlogEnd   = shift(6)
+      const ongoingStart = shift(-1)
+      const ongoingEnd   = shift(3)
       return filteredProjects.map((p) => {
         if (p.startDate && p.targetDate) return p
-        return { ...p, startDate: p.startDate ?? defaultStart, targetDate: p.targetDate ?? defaultEnd, estimatedDates: true, estimatedStart: !p.startDate, estimatedEnd: !p.targetDate }
+        const isBacklog = p.state.type === 'backlog'
+        if (isBacklog) {
+          return {
+            ...p,
+            startDate: p.startDate ?? backlogStart,
+            targetDate: p.targetDate ?? backlogEnd,
+            estimatedDates: true,
+            estimatedStart: !p.startDate,
+            estimatedEnd: !p.targetDate,
+          }
+        }
+        return {
+          ...p,
+          startDate: p.startDate ?? ongoingStart,
+          targetDate: p.targetDate ?? ongoingEnd,
+          estimatedDates: false,
+          estimatedStart: !p.startDate,
+          estimatedEnd: !p.targetDate,
+        }
       })
     }, [filteredProjects])
 
