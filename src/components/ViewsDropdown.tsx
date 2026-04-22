@@ -10,6 +10,7 @@ interface ViewsDropdownProps {
   onSaveAsNew: (name: string) => void
   onRename: (viewId: string, name: string) => void
   onDelete: (viewId: string) => void
+  onOverwrite: (viewId: string) => void
 }
 
 export default function ViewsDropdown({
@@ -21,6 +22,7 @@ export default function ViewsDropdown({
   onSaveAsNew,
   onRename,
   onDelete,
+  onOverwrite,
 }: ViewsDropdownProps) {
   const [open, setOpen] = useState(false)
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -146,6 +148,13 @@ export default function ViewsDropdown({
                   <span className="views-dropdown-item-name">{view.name}</span>
                 )}
                 <div className="views-dropdown-item-actions">
+                  <button
+                    className="views-dropdown-item-btn"
+                    title="Overwrite with current state"
+                    onClick={(e) => { e.stopPropagation(); onOverwrite(view.id); setOpen(false) }}
+                  >
+                    ↑
+                  </button>
                   <button
                     className="views-dropdown-item-btn"
                     title="Rename"

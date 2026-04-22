@@ -326,7 +326,7 @@ export async function findOrCreateConfigIssue(configProjectId: string): Promise<
 
 function buildConfigDescription(config: RoadmapConfig): string {
   const json = JSON.stringify(config)
-  return `This issue stores roadmap view configuration. Do not edit manually.\n\n<!-- ROADMAP_CONFIG\n${json}\nROADMAP_CONFIG -->`
+  return `Roadmap view configuration — do not edit manually.\n\n\`\`\`roadmap-config\n${json}\n\`\`\``
 }
 
 export async function readConfigIssue(issueId: string): Promise<RoadmapConfig | null> {
@@ -345,7 +345,12 @@ export async function readConfigIssue(issueId: string): Promise<RoadmapConfig | 
     const desc = data.issue.description
     if (!desc) return null
 
-    const match = desc.match(/<!--\s*ROADMAP_CONFIG\s*\n([\s\S]*?)\nROADMAP_CONFIG\s*-->/)
+    // Primary format: code fence (preserved by Linear's Prosemirror editor).
+    // Fallback: legacy HTML comment format (Linear strips these, so this only
+    // helps if somehow the old format survived).
+    const match =
+      desc.match(/```roadmap-config\n([\s\S]*?)\n```/) ??
+      desc.match(/<!--\s*ROADMAP_CONFIG\s*\n([\s\S]*?)\nROADMAP_CONFIG\s*-->/)
     if (!match || !match[1]) return null
 
     const parsed = JSON.parse(match[1].trim()) as RoadmapConfig

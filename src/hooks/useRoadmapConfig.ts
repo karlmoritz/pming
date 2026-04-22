@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { RoadmapConfig } from '../types'
 import {
   fetchTeams,
@@ -22,6 +22,13 @@ export function useRoadmapConfig(apiKey: string, teamId: string | undefined): Us
   const [configError, setConfigError] = useState<string | null>(null)
   const [configIssueId, setConfigIssueId] = useState<string | null>(null)
 
+  // Keep teamId accessible inside the effect without making it a dependency.
+  // The config lives in a single global issue — teamId is only needed for
+  // first-time project creation. Re-running the load every time the team
+  // selection changes would race against in-flight saveConfig writes.
+  const teamIdRef = useRef(teamId)
+  teamIdRef.current = teamId
+
   useEffect(() => {
     if (!apiKey) return
 
@@ -33,7 +40,7 @@ export function useRoadmapConfig(apiKey: string, teamId: string | undefined): Us
 
       try {
         // Determine the team to use for the config project
-        let resolvedTeamId = teamId
+        let resolvedTeamId = teamIdRef.current
         if (!resolvedTeamId) {
           const teams = await fetchTeams()
           const sorted = [...teams].sort((a, b) => a.name.localeCompare(b.name))
@@ -75,7 +82,7 @@ export function useRoadmapConfig(apiKey: string, teamId: string | undefined): Us
           setConfig(
             savedConfig ?? {
               version: 1,
-              teamId,
+              teamId: teamIdRef.current,
               swimlaneMode: 'initiative',
               milestones: [],
             }
@@ -88,7 +95,7 @@ export function useRoadmapConfig(apiKey: string, teamId: string | undefined): Us
           // Still provide a default config so the app is usable
           setConfig({
             version: 1,
-            teamId,
+            teamId: teamIdRef.current,
             swimlaneMode: 'initiative',
             milestones: [],
           })
@@ -102,7 +109,10 @@ export function useRoadmapConfig(apiKey: string, teamId: string | undefined): Us
 
     void loadConfig()
     return () => { cancelled = true }
-  }, [apiKey, teamId])
+  // teamId intentionally omitted — config is a single global issue; reloading
+  // on every team-selection change races against in-flight writeConfigIssue calls.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiKey])
 
   const saveConfig = useCallback(
     async (newConfig: RoadmapConfig) => {

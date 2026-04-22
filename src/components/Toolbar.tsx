@@ -39,6 +39,7 @@ interface ToolbarProps {
   onSaveAsNewView: (name: string) => void
   onRenameView: (viewId: string, name: string) => void
   onDeleteView: (viewId: string) => void
+  onOverwriteView: (viewId: string) => void
 }
 
 function granularityLabel(ppd: number): string {
@@ -82,6 +83,7 @@ export default function Toolbar({
   onSaveAsNewView,
   onRenameView,
   onDeleteView,
+  onOverwriteView,
 }: ToolbarProps) {
   const currentMode = swimlaneMode ?? 'initiative'
 
@@ -119,6 +121,7 @@ export default function Toolbar({
         onSaveAsNew={onSaveAsNewView}
         onRename={onRenameView}
         onDelete={onDeleteView}
+        onOverwrite={onOverwriteView}
       />
 
       <div className="toolbar-divider" />

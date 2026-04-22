@@ -158,15 +158,22 @@ export default function RoadmapPage({ apiKey, onLogout, theme, onToggleTheme }: 
 
   function handleSaveView() {
     if (!activeViewId) return
+    handleOverwriteView(activeViewId)
+  }
+
+  function handleOverwriteView(viewId: string) {
+    const view = views.find((v) => v.id === viewId)
+    if (!view) return
     const updated: NamedView = {
-      id: activeViewId,
-      name: views.find((v) => v.id === activeViewId)?.name ?? 'View',
+      id: viewId,
+      name: view.name,
       selectedTeamIds,
       swimlaneMode: effectiveSwimlaneMode,
       hiddenLabelIds: effectiveConfig.hiddenLabelIds ?? [],
     }
-    const nextViews = views.map((v) => (v.id === activeViewId ? updated : v))
+    const nextViews = views.map((v) => (v.id === viewId ? updated : v))
     void saveConfig({ ...effectiveConfig, views: nextViews })
+    setActiveViewId(viewId)
   }
 
   function handleSaveAsNewView(name: string) {
@@ -260,6 +267,7 @@ export default function RoadmapPage({ apiKey, onLogout, theme, onToggleTheme }: 
         onSaveAsNewView={handleSaveAsNewView}
         onRenameView={handleRenameView}
         onDeleteView={handleDeleteView}
+        onOverwriteView={handleOverwriteView}
       />
 
       {bannerError && (
