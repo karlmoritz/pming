@@ -26,8 +26,14 @@ function fieldLabel(field: PendingChange['field']): string {
     case 'startDate': return 'Start Date'
     case 'targetDate': return 'Target Date'
     case 'initiativeId': return 'Initiative'
+    case 'labelIds': return 'Labels'
     default: return field
   }
+}
+
+function displayNewValue(c: PendingChange): string {
+  if (c.displayValue !== undefined) return c.displayValue
+  return c.newValue ?? '(none)'
 }
 
 export default function SyncPanel({ changes, onConfirm, onCancel, onDiscard }: SyncPanelProps) {
@@ -80,7 +86,7 @@ export default function SyncPanel({ changes, onConfirm, onCancel, onDiscard }: S
                         </span>
                         <span className="sync-change-arrow">→</span>
                         <span className="sync-change-value">
-                          {c.newValue ?? '(none)'}
+                          {displayNewValue(c)}
                         </span>
                       </div>
                     ))}

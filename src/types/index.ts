@@ -53,9 +53,20 @@ export interface Milestone {
 export interface PendingChange {
   projectId: string
   projectName: string
-  field: 'startDate' | 'targetDate' | 'initiativeId'
+  field: 'startDate' | 'targetDate' | 'initiativeId' | 'labelIds'
   oldValue?: string
   newValue?: string
+  displayValue?: string
+}
+
+export interface NamedView {
+  id: string
+  name: string
+  selectedTeamIds: string[]
+  swimlaneMode: SwimlaneMode
+  hiddenLabelIds: string[]
+  viewStartDate?: string
+  viewEndDate?: string
 }
 
 export interface RoadmapConfig {
@@ -67,6 +78,7 @@ export interface RoadmapConfig {
   viewStartDate?: string
   viewEndDate?: string
   hiddenLabelIds?: string[]
+  views?: NamedView[]
 }
 
 export interface Swimlane {

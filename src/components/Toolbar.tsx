@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import type { Team, SwimlaneMode } from '../types'
+import type { Team, SwimlaneMode, NamedView } from '../types'
 import type { LabelGroup } from '../api/linear'
 import LabelFilterDropdown from './LabelFilterDropdown'
+import ViewsDropdown from './ViewsDropdown'
 
 interface Label { id: string; name: string; color: string }
 
@@ -30,6 +31,14 @@ interface ToolbarProps {
   loading: boolean
   theme: 'dark' | 'light'
   onToggleTheme: () => void
+  views: NamedView[]
+  activeViewId: string | null
+  isViewDirty: boolean
+  onLoadView: (viewId: string) => void
+  onSaveView: () => void
+  onSaveAsNewView: (name: string) => void
+  onRenameView: (viewId: string, name: string) => void
+  onDeleteView: (viewId: string) => void
 }
 
 function granularityLabel(ppd: number): string {
@@ -65,6 +74,14 @@ export default function Toolbar({
   loading,
   theme,
   onToggleTheme,
+  views,
+  activeViewId,
+  isViewDirty,
+  onLoadView,
+  onSaveView,
+  onSaveAsNewView,
+  onRenameView,
+  onDeleteView,
 }: ToolbarProps) {
   const currentMode = swimlaneMode ?? 'initiative'
 
@@ -90,6 +107,19 @@ export default function Toolbar({
   return (
     <div className="toolbar">
       <span className="toolbar-title">Linear Roadmap</span>
+
+      <div className="toolbar-divider" />
+
+      <ViewsDropdown
+        views={views}
+        activeViewId={activeViewId}
+        isDirty={isViewDirty}
+        onLoad={onLoadView}
+        onSave={onSaveView}
+        onSaveAsNew={onSaveAsNewView}
+        onRename={onRenameView}
+        onDelete={onDeleteView}
+      />
 
       <div className="toolbar-divider" />
 

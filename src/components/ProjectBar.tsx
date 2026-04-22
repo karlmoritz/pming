@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import type { LinearProject, TimelineRange, PendingChange, Team } from '../types'
+import type { LinearProject, TimelineRange, PendingChange, Team, SwimlaneMode } from '../types'
 import { dateToX, xToDate, formatDate, parseDate } from '../utils/timeline'
 
 interface ProjectBarProps {
@@ -7,6 +7,8 @@ interface ProjectBarProps {
   timelineRange: TimelineRange
   pixelsPerDay: number
   teams: Team[]
+  swimlaneMode: SwimlaneMode
+  swimlaneId: string
   onProjectChange: (change: PendingChange) => void
 }
 
@@ -47,6 +49,8 @@ export default function ProjectBar({
   timelineRange,
   pixelsPerDay,
   teams,
+  swimlaneMode,
+  swimlaneId,
   onProjectChange,
 }: ProjectBarProps) {
   const dragRef = useRef<DragState | null>(null)
@@ -55,6 +59,8 @@ export default function ProjectBar({
   const [dragOffsetPx, setDragOffsetPx] = useState(0)
   const [resizeOffsetPx, setResizeOffsetPx] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
+  const [isSwimlaneDragging, setIsSwimlaneDragging] = useState(false)
+  const swimlaneDragTargetRef = useRef<string | null>(null)
   const [showTooltip, setShowTooltip] = useState(false)
   const [tooltipPos, setTooltipPos] = useState<TooltipPos>({ x: 0, y: 0 })
 
@@ -167,10 +173,109 @@ export default function ProjectBar({
     }
   }, [isDragging, project, timelineRange, pixelsPerDay, onProjectChange, barWidth])
 
+  useEffect(() => {
+    if (!isSwimlaneDragging) return
+
+    function getSwimlaneAtPoint(x: number, y: number): { id: string; label: string } | null {
+      const els = document.elementsFromPoint(x, y)
+      for (const el of els) {
+        const swimlaneEl = el.closest('[data-swimlane-id]') as HTMLElement | null
+        if (swimlaneEl) {
+          return {
+            id: swimlaneEl.dataset.swimlaneId ?? '',
+            label: swimlaneEl.dataset.swimlaneLabel ?? '',
+          }
+        }
+      }
+      return null
+    }
+
+    function handleMouseMove(e: MouseEvent) {
+      const target = getSwimlaneAtPoint(e.clientX, e.clientY)
+      const targetId = target?.id ?? null
+
+      if (targetId !== swimlaneDragTargetRef.current) {
+        // Remove previous highlight
+        if (swimlaneDragTargetRef.current) {
+          document.querySelector(`[data-swimlane-id="${swimlaneDragTargetRef.current}"]`)
+            ?.classList.remove('swimlane-drag-target')
+        }
+        swimlaneDragTargetRef.current = targetId
+        // Add new highlight (only if different from current swimlane)
+        if (targetId && targetId !== swimlaneId) {
+          document.querySelector(`[data-swimlane-id="${targetId}"]`)
+            ?.classList.add('swimlane-drag-target')
+        }
+      }
+    }
+
+    function handleMouseUp(e: MouseEvent) {
+      const target = getSwimlaneAtPoint(e.clientX, e.clientY)
+
+      // Clean up highlights
+      if (swimlaneDragTargetRef.current) {
+        document.querySelector(`[data-swimlane-id="${swimlaneDragTargetRef.current}"]`)
+          ?.classList.remove('swimlane-drag-target')
+        swimlaneDragTargetRef.current = null
+      }
+
+      setIsSwimlaneDragging(false)
+
+      if (!target || target.id === swimlaneId) return
+
+      if (swimlaneMode === 'initiative') {
+        // target.id is the initiative id (or '__no_initiative__')
+        const newInitiativeId = target.id === '__no_initiative__' ? undefined : target.id
+        onProjectChange({
+          projectId: project.id,
+          projectName: project.name,
+          field: 'initiativeId',
+          oldValue: project.initiative?.id,
+          newValue: newInitiativeId,
+          displayValue: target.label,
+        })
+      } else if (swimlaneMode === 'label') {
+        // target.id is a label id (or '__no_label__')
+        // Alt+drag replaces all labels with the target label
+        const shiftHeld = e.shiftKey
+        const currentLabelIds = project.labels.map((l) => l.id)
+        let newLabelIds: string[]
+        if (target.id === '__no_label__') {
+          newLabelIds = []
+        } else if (shiftHeld) {
+          // Add to existing labels
+          newLabelIds = [...new Set([...currentLabelIds, target.id])]
+        } else {
+          newLabelIds = [target.id]
+        }
+        onProjectChange({
+          projectId: project.id,
+          projectName: project.name,
+          field: 'labelIds',
+          oldValue: currentLabelIds.join(','),
+          newValue: newLabelIds.join(','),
+          displayValue: target.label,
+        })
+      }
+      // team mode: no-op (can't move between teams this way)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isSwimlaneDragging, swimlaneMode, swimlaneId, project, onProjectChange])
+
   function handleBodyMouseDown(e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
     setShowTooltip(false)
+    if (e.altKey) {
+      setIsSwimlaneDragging(true)
+      return
+    }
     dragRef.current = { type: 'move', startX: e.clientX, originalStartDate: startDate, originalEndDate: endDate }
     setIsDragging(true)
   }
@@ -235,7 +340,7 @@ export default function ProjectBar({
   return (
     <>
       <div
-        className={`project-bar${isDragging ? ' dragging' : ''}${isBacklogEstimated ? ' estimated' : ''}`}
+        className={`project-bar${isDragging ? ' dragging' : ''}${isSwimlaneDragging ? ' swimlane-dragging' : ''}${isBacklogEstimated ? ' estimated' : ''}`}
         style={{
           left: currentLeft,
           width: currentWidth,

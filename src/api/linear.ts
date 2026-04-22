@@ -450,6 +450,20 @@ export async function applyChanges(
           // Silently skip initiative errors
           applied++
         }
+      } else if (change.field === 'labelIds') {
+        const labelIds = change.newValue ? change.newValue.split(',').filter(Boolean) : []
+        await gql<{ projectUpdate: { success: boolean } }>(`
+          mutation UpdateProject($id: String!, $input: ProjectUpdateInput!) {
+            projectUpdate(id: $id, input: $input) {
+              success
+              project { id }
+            }
+          }
+        `, {
+          id: change.projectId,
+          input: { labelIds },
+        })
+        applied++
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)

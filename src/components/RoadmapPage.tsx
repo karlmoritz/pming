@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import type { PendingChange, RoadmapConfig, SwimlaneMode } from '../types'
+import type { PendingChange, RoadmapConfig, SwimlaneMode, NamedView } from '../types'
 import { useLinearData } from '../hooks/useLinearData'
 import { useRoadmapConfig } from '../hooks/useRoadmapConfig'
 import { applyChanges } from '../api/linear'
@@ -38,6 +38,7 @@ export default function RoadmapPage({ apiKey, onLogout, theme, onToggleTheme }: 
   const [showSyncPanel, setShowSyncPanel] = useState(false)
   const [bannerError, setBannerError] = useState<string | null>(null)
   const [displayPpd, setDisplayPpd] = useState(320 / 91)
+  const [activeViewId, setActiveViewId] = useState<string | null>(null)
 
   const canvasRef = useRef<RoadmapCanvasHandle>(null)
 
@@ -51,6 +52,16 @@ export default function RoadmapPage({ apiKey, onLogout, theme, onToggleTheme }: 
     selectedTeamIds[0]
   )
 
+  // Derived from config — declared early so all handlers below can reference it
+  const effectiveConfig: RoadmapConfig = config ?? {
+    version: 1,
+    swimlaneMode: 'initiative',
+    milestones: [],
+  }
+
+  const effectiveSwimlaneMode: SwimlaneMode = localSwimlaneMode ?? 'initiative'
+  const views: NamedView[] = effectiveConfig.views ?? []
+
   // Once config loads, adopt its swimlane mode if URL didn't specify one
   useEffect(() => {
     if (config && localSwimlaneMode === null) {
@@ -59,7 +70,6 @@ export default function RoadmapPage({ apiKey, onLogout, theme, onToggleTheme }: 
   }, [config, localSwimlaneMode])
 
   // Sync selectedTeamIds and swimlaneMode to URL (replaceState — no history entries)
-  const effectiveSwimlaneMode: SwimlaneMode = localSwimlaneMode ?? 'initiative'
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (selectedTeamIds.length > 0) {
@@ -87,6 +97,21 @@ export default function RoadmapPage({ apiKey, onLogout, theme, onToggleTheme }: 
   useEffect(() => {
     if (configError) setBannerError(configError)
   }, [configError])
+
+  const isViewDirty = useMemo(() => {
+    if (!activeViewId) return false
+    const view = views.find((v) => v.id === activeViewId)
+    if (!view) return true
+    const teamsSame =
+      view.selectedTeamIds.length === selectedTeamIds.length &&
+      view.selectedTeamIds.every((id) => selectedTeamIds.includes(id))
+    const modeSame = view.swimlaneMode === effectiveSwimlaneMode
+    const labelsSame =
+      (view.hiddenLabelIds ?? []).length === (effectiveConfig.hiddenLabelIds ?? []).length &&
+      (view.hiddenLabelIds ?? []).every((id) => (effectiveConfig.hiddenLabelIds ?? []).includes(id))
+    return !teamsSame || !modeSame || !labelsSame
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeViewId, views, selectedTeamIds, effectiveSwimlaneMode, effectiveConfig.hiddenLabelIds])
 
   function handleProjectChange(change: PendingChange) {
     setPendingChanges((prev) => {
@@ -121,6 +146,54 @@ export default function RoadmapPage({ apiKey, onLogout, theme, onToggleTheme }: 
     setPendingChanges([])
   }
 
+  function handleLoadView(viewId: string) {
+    const view = views.find((v) => v.id === viewId)
+    if (!view) return
+    setSelectedTeamIds(view.selectedTeamIds)
+    setLocalSwimlaneMode(view.swimlaneMode)
+    void saveConfig({ ...effectiveConfig, hiddenLabelIds: view.hiddenLabelIds ?? [] })
+    setActiveViewId(viewId)
+    setPendingChanges([])
+  }
+
+  function handleSaveView() {
+    if (!activeViewId) return
+    const updated: NamedView = {
+      id: activeViewId,
+      name: views.find((v) => v.id === activeViewId)?.name ?? 'View',
+      selectedTeamIds,
+      swimlaneMode: effectiveSwimlaneMode,
+      hiddenLabelIds: effectiveConfig.hiddenLabelIds ?? [],
+    }
+    const nextViews = views.map((v) => (v.id === activeViewId ? updated : v))
+    void saveConfig({ ...effectiveConfig, views: nextViews })
+  }
+
+  function handleSaveAsNewView(name: string) {
+    const id = `view-${Date.now()}`
+    const newView: NamedView = {
+      id,
+      name,
+      selectedTeamIds,
+      swimlaneMode: effectiveSwimlaneMode,
+      hiddenLabelIds: effectiveConfig.hiddenLabelIds ?? [],
+    }
+    const nextViews = [...views, newView]
+    void saveConfig({ ...effectiveConfig, views: nextViews })
+    setActiveViewId(id)
+  }
+
+  function handleRenameView(viewId: string, name: string) {
+    const nextViews = views.map((v) => (v.id === viewId ? { ...v, name } : v))
+    void saveConfig({ ...effectiveConfig, views: nextViews })
+  }
+
+  function handleDeleteView(viewId: string) {
+    const nextViews = views.filter((v) => v.id !== viewId)
+    void saveConfig({ ...effectiveConfig, views: nextViews })
+    if (activeViewId === viewId) setActiveViewId(null)
+  }
+
   function handleToggleLabel(id: string) {
     const current = effectiveConfig.hiddenLabelIds ?? []
     const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id]
@@ -152,12 +225,6 @@ export default function RoadmapPage({ apiKey, onLogout, theme, onToggleTheme }: 
     return labels
   }, [projects])
 
-  const effectiveConfig: RoadmapConfig = config ?? {
-    version: 1,
-    swimlaneMode: 'initiative',
-    milestones: [],
-  }
-
   return (
     <>
       <Toolbar
@@ -185,6 +252,14 @@ export default function RoadmapPage({ apiKey, onLogout, theme, onToggleTheme }: 
         loading={loading}
         theme={theme}
         onToggleTheme={onToggleTheme}
+        views={views}
+        activeViewId={activeViewId}
+        isViewDirty={isViewDirty}
+        onLoadView={handleLoadView}
+        onSaveView={handleSaveView}
+        onSaveAsNewView={handleSaveAsNewView}
+        onRenameView={handleRenameView}
+        onDeleteView={handleDeleteView}
       />
 
       {bannerError && (

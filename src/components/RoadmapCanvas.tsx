@@ -421,6 +421,7 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
                   timelineRange={timelineRange}
                   pixelsPerDay={ppd}
                   teams={teams}
+                  swimlaneMode={swimlaneMode}
                   onProjectChange={onProjectChange}
                 />
               ))}
