@@ -66,8 +66,8 @@ export default function AuthGate({ onAuth }: AuthGateProps) {
         </form>
 
         <div className="auth-link">
-          <a href="https://linear.app/settings/api" target="_blank" rel="noopener noreferrer">
-            Get your API key at linear.app/settings/api
+          <a href="https://linear.app/settings/account/security" target="_blank" rel="noopener noreferrer">
+            Get your API key at linear.app/settings/account/security
           </a>
         </div>
       </div>
