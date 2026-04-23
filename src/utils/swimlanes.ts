@@ -5,18 +5,44 @@ export function buildSwimlanes(
   mode: SwimlaneMode,
   initiatives: Initiative[],
   hiddenLabelIds: string[] = [],
-  teams: Team[] = []
+  teams: Team[] = [],
+  hiddenInitiativeIds: string[] = [],
+  swimlaneOrder?: Partial<Record<SwimlaneMode, string[]>>
 ): Swimlane[] {
+  let swimlanes: Swimlane[]
   if (mode === 'initiative') {
-    return buildByInitiative(projects, initiatives)
+    swimlanes = buildByInitiative(projects, initiatives, hiddenInitiativeIds)
   } else if (mode === 'label') {
-    return buildByLabel(projects, hiddenLabelIds)
+    swimlanes = buildByLabel(projects, hiddenLabelIds)
   } else {
-    return buildByTeam(projects, teams)
+    swimlanes = buildByTeam(projects, teams)
   }
+
+  const order = swimlaneOrder?.[mode]
+  if (order && order.length > 0) {
+    swimlanes = applyOrder(swimlanes, order)
+  }
+  return swimlanes
 }
 
-function buildByInitiative(projects: LinearProject[], _initiatives: Initiative[]): Swimlane[] {
+function applyOrder(swimlanes: Swimlane[], order: string[]): Swimlane[] {
+  const map = new Map(swimlanes.map((s) => [s.id, s]))
+  const result: Swimlane[] = []
+  for (const id of order) {
+    const sw = map.get(id)
+    if (sw) result.push(sw)
+  }
+  for (const sw of swimlanes) {
+    if (!order.includes(sw.id)) result.push(sw)
+  }
+  return result
+}
+
+function buildByInitiative(
+  projects: LinearProject[],
+  _initiatives: Initiative[],
+  hiddenInitiativeIds: string[] = []
+): Swimlane[] {
   const map = new Map<string, Swimlane>()
 
   for (const project of projects) {
@@ -38,6 +64,7 @@ function buildByInitiative(projects: LinearProject[], _initiatives: Initiative[]
   const named: Swimlane[] = []
   const fallback: Swimlane[] = []
   for (const [id, sw] of map) {
+    if (hiddenInitiativeIds.includes(id)) continue
     ;(id === '__no_initiative__' ? fallback : named).push(sw)
   }
   named.sort((a, b) => a.label.localeCompare(b.label))

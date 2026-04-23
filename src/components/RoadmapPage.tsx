@@ -52,7 +52,6 @@ export default function RoadmapPage({ apiKey, onLogout, theme, onToggleTheme }: 
     selectedTeamIds[0]
   )
 
-  // Derived from config — declared early so all handlers below can reference it
   const effectiveConfig: RoadmapConfig = config ?? {
     version: 1,
     swimlaneMode: 'initiative',
@@ -62,14 +61,12 @@ export default function RoadmapPage({ apiKey, onLogout, theme, onToggleTheme }: 
   const effectiveSwimlaneMode: SwimlaneMode = localSwimlaneMode ?? 'initiative'
   const views: NamedView[] = effectiveConfig.views ?? []
 
-  // Once config loads, adopt its swimlane mode if URL didn't specify one
   useEffect(() => {
     if (config && localSwimlaneMode === null) {
       setLocalSwimlaneMode(config.swimlaneMode)
     }
   }, [config, localSwimlaneMode])
 
-  // Sync selectedTeamIds and swimlaneMode to URL (replaceState — no history entries)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (selectedTeamIds.length > 0) {
@@ -224,12 +221,47 @@ export default function RoadmapPage({ apiKey, onLogout, theme, onToggleTheme }: 
     void saveConfig({ ...effectiveConfig, hiddenLabelIds: next })
   }
 
+  function handleToggleInitiative(id: string) {
+    const current = effectiveConfig.hiddenInitiativeIds ?? []
+    const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id]
+    void saveConfig({ ...effectiveConfig, hiddenInitiativeIds: next })
+  }
+
+  function handleShowAllInitiatives() {
+    void saveConfig({ ...effectiveConfig, hiddenInitiativeIds: [] })
+  }
+
+  function handleHideAllInitiatives() {
+    void saveConfig({ ...effectiveConfig, hiddenInitiativeIds: allInitiatives.map((i) => i.id) })
+  }
+
+  function handleSwimlaneReorder(mode: SwimlaneMode, ids: string[]) {
+    const current = effectiveConfig.swimlaneOrder ?? {}
+    void saveConfig({ ...effectiveConfig, swimlaneOrder: { ...current, [mode]: ids } })
+  }
+
   const allLabels = useMemo(() => {
     const labels = collectLabels(projects)
     if (projects.some((p) => p.labels.length === 0)) {
       labels.push({ id: '__no_label__', name: 'No Labels', color: '#888888' })
     }
     return labels
+  }, [projects])
+
+  const allInitiatives = useMemo(() => {
+    const seen = new Map<string, { id: string; name: string; color: string }>()
+    for (const p of projects) {
+      for (const init of p.initiatives) {
+        if (!seen.has(init.id)) {
+          seen.set(init.id, { id: init.id, name: init.name, color: init.color ?? '#888888' })
+        }
+      }
+    }
+    const list = [...seen.values()].sort((a, b) => a.name.localeCompare(b.name))
+    if (projects.some((p) => p.initiatives.length === 0)) {
+      list.push({ id: '__no_initiative__', name: 'No Initiative', color: '#888888' })
+    }
+    return list
   }, [projects])
 
   return (
@@ -251,6 +283,11 @@ export default function RoadmapPage({ apiKey, onLogout, theme, onToggleTheme }: 
         onToggleGroup={handleToggleGroup}
         onShowAllLabels={handleShowAllLabels}
         onHideAllLabels={handleHideAllLabels}
+        allInitiatives={allInitiatives}
+        hiddenInitiativeIds={effectiveConfig.hiddenInitiativeIds ?? []}
+        onToggleInitiative={handleToggleInitiative}
+        onShowAllInitiatives={handleShowAllInitiatives}
+        onHideAllInitiatives={handleHideAllInitiatives}
         pendingCount={pendingChanges.length}
         onSync={() => setShowSyncPanel(true)}
         onAddMilestone={() => setShowMilestonePanel(true)}
@@ -299,6 +336,9 @@ export default function RoadmapPage({ apiKey, onLogout, theme, onToggleTheme }: 
           viewStartDate={effectiveConfig.viewStartDate}
           viewEndDate={effectiveConfig.viewEndDate}
           hiddenLabelIds={effectiveConfig.hiddenLabelIds ?? []}
+          hiddenInitiativeIds={effectiveConfig.hiddenInitiativeIds ?? []}
+          swimlaneOrder={effectiveConfig.swimlaneOrder}
+          onSwimlaneReorder={handleSwimlaneReorder}
         />
       )}
 

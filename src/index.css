@@ -1059,6 +1059,45 @@ input:focus, select:focus { border-color: var(--accent); }
   cursor: grabbing !important;
 }
 
+/* Swimlane reorder drag states */
+.swimlane-dragging-row {
+  opacity: 0.4;
+}
+.swimlane-drag-over {
+  border-top: 2px solid var(--accent) !important;
+}
+.swimlane-drag-handle {
+  font-size: 14px;
+  color: var(--text-muted);
+  opacity: 0.4;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-top: 1px;
+  cursor: grab;
+  user-select: none;
+}
+.swimlane-label:hover .swimlane-drag-handle {
+  opacity: 0.8;
+}
+
+/* Milestone flag labels pinned in the header row (no overlap with project bars) */
+.timeline-header-row-minor {
+  position: relative;
+  overflow: visible;
+}
+.milestone-flag-header {
+  position: absolute;
+  top: 2px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: #fff;
+  pointer-events: none;
+  z-index: 12;
+}
+
 /* Views dropdown */
 .views-dropdown-wrap { position: relative; }
 .views-dropdown {

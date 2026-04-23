@@ -7,6 +7,7 @@ interface MilestoneMarkerProps {
   pixelsPerDay: number
   canvasHeight: number
   labelOffset?: number
+  showFlag?: boolean
 }
 
 export default function MilestoneMarker({
@@ -15,6 +16,7 @@ export default function MilestoneMarker({
   pixelsPerDay,
   canvasHeight,
   labelOffset = 0,
+  showFlag = true,
 }: MilestoneMarkerProps) {
   const date = parseDate(milestone.date)
   const x = dateToX(date, timelineRange.startDate, pixelsPerDay) + labelOffset
@@ -28,12 +30,14 @@ export default function MilestoneMarker({
         className="milestone-line"
         style={{ borderColor: milestone.color, height: canvasHeight }}
       />
-      <div
-        className="milestone-flag"
-        style={{ backgroundColor: milestone.color }}
-      >
-        {milestone.label}
-      </div>
+      {showFlag && (
+        <div
+          className="milestone-flag"
+          style={{ backgroundColor: milestone.color }}
+        >
+          {milestone.label}
+        </div>
+      )}
     </div>
   )
 }

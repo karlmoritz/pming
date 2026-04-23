@@ -23,6 +23,11 @@ interface ToolbarProps {
   onToggleGroup: (childIds: string[]) => void
   onShowAllLabels: () => void
   onHideAllLabels: () => void
+  allInitiatives: Label[]
+  hiddenInitiativeIds: string[]
+  onToggleInitiative: (id: string) => void
+  onShowAllInitiatives: () => void
+  onHideAllInitiatives: () => void
   pendingCount: number
   onSync: () => void
   onAddMilestone: () => void
@@ -67,6 +72,11 @@ export default function Toolbar({
   onToggleGroup,
   onShowAllLabels,
   onHideAllLabels,
+  allInitiatives,
+  hiddenInitiativeIds,
+  onToggleInitiative,
+  onShowAllInitiatives,
+  onHideAllInitiatives,
   pendingCount,
   onSync,
   onAddMilestone,
@@ -185,6 +195,24 @@ export default function Toolbar({
           By Team
         </button>
       </div>
+
+      {/* Initiative filter — only visible in initiative mode */}
+      {currentMode === 'initiative' && allInitiatives.length > 0 && (
+        <>
+          <div className="toolbar-divider" />
+          <LabelFilterDropdown
+            labels={allInitiatives}
+            labelGroups={[]}
+            hiddenLabelIds={hiddenInitiativeIds}
+            onToggle={onToggleInitiative}
+            onToggleGroup={() => {}}
+            onShowAll={onShowAllInitiatives}
+            onHideAll={onHideAllInitiatives}
+            title="Initiative Swimlanes"
+            buttonLabel="Initiatives"
+          />
+        </>
+      )}
 
       {/* Label filter — only visible in label mode */}
       {currentMode === 'label' && (

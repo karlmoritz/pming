@@ -15,6 +15,8 @@ interface LabelFilterDropdownProps {
   onToggleGroup: (childIds: string[]) => void
   onShowAll: () => void
   onHideAll: () => void
+  title?: string
+  buttonLabel?: string
 }
 
 export default function LabelFilterDropdown({
@@ -25,6 +27,8 @@ export default function LabelFilterDropdown({
   onToggleGroup,
   onShowAll,
   onHideAll,
+  title = 'Label Swimlanes',
+  buttonLabel = 'Labels',
 }: LabelFilterDropdownProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -54,9 +58,9 @@ export default function LabelFilterDropdown({
       <button
         className={hiddenCount > 0 ? 'primary' : ''}
         onClick={() => setOpen((v) => !v)}
-        title="Show/hide label swimlanes"
+        title={`Show/hide ${title.toLowerCase()}`}
       >
-        Labels {hiddenCount > 0 && <span className="sync-badge">{hiddenCount} hidden</span>}
+        {buttonLabel} {hiddenCount > 0 && <span className="sync-badge">{hiddenCount} hidden</span>}
         <span style={{ marginLeft: 4, fontSize: 10 }}>{open ? '▲' : '▼'}</span>
       </button>
 
@@ -64,7 +68,7 @@ export default function LabelFilterDropdown({
         <div className="label-filter-dropdown">
           <div className="label-filter-header">
             <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Label Swimlanes
+              {title}
             </span>
             <div style={{ display: 'flex', gap: 6 }}>
               <button onClick={onShowAll} style={{ padding: '2px 8px', fontSize: 11 }}>Show all</button>

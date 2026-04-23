@@ -78,6 +78,8 @@ export interface RoadmapConfig {
   viewStartDate?: string
   viewEndDate?: string
   hiddenLabelIds?: string[]
+  hiddenInitiativeIds?: string[]
+  swimlaneOrder?: Partial<Record<SwimlaneMode, string[]>>
   views?: NamedView[]
 }
 

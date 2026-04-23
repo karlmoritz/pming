@@ -41,6 +41,9 @@ interface RoadmapCanvasProps {
   viewStartDate?: string
   viewEndDate?: string
   hiddenLabelIds?: string[]
+  hiddenInitiativeIds?: string[]
+  swimlaneOrder?: Partial<Record<SwimlaneMode, string[]>>
+  onSwimlaneReorder?: (mode: SwimlaneMode, ids: string[]) => void
 }
 
 export interface RoadmapCanvasHandle {
@@ -101,6 +104,9 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
       viewStartDate,
       viewEndDate,
       hiddenLabelIds = [],
+      hiddenInitiativeIds = [],
+      swimlaneOrder,
+      onSwimlaneReorder,
     },
     ref
   ) {
@@ -108,6 +114,9 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
     const scrollRef = useRef<HTMLDivElement>(null)
     const bodyRef = useRef<HTMLDivElement>(null)
     const pendingZoom = useRef<{ scrollLeft: number; ratio: number; anchorX: number } | null>(null)
+
+    const [draggingId, setDraggingId] = useState<string | null>(null)
+    const [dragOverId, setDragOverId] = useState<string | null>(null)
 
     useImperativeHandle(ref, () => ({
       zoomIn: () => setPpd((p) => Math.min(200, p * 2)),
@@ -118,7 +127,6 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
       onZoomChange?.(ppd)
     }, [ppd, onZoomChange])
 
-    // After render, apply the pending scroll adjustment
     useLayoutEffect(() => {
       if (pendingZoom.current && scrollRef.current) {
         const { scrollLeft, ratio, anchorX } = pendingZoom.current
@@ -131,7 +139,6 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
       const el = scrollRef.current
       if (!el) return
       function handleWheel(e: WheelEvent) {
-        // Ctrl+wheel OR trackpad pinch (browser sends as ctrlKey)
         if (!e.ctrlKey && !e.metaKey) return
         e.preventDefault()
         e.stopPropagation()
@@ -180,9 +187,6 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
     const years = useMemo(() => getYearsInRange(timelineRange), [timelineRange])
     const days = useMemo(() => getDaysInRange(timelineRange), [timelineRange])
 
-    // Projects with missing dates get estimated display dates.
-    // Backlog: +3m start, +6m end (fully shaded).
-    // Ongoing: -1m start if missing, +3m end if missing (gradient edge only).
     const projectedProjects = useMemo(() => {
       const d = new Date()
       const shift = (months: number) =>
@@ -222,9 +226,52 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
     }, [filteredProjects])
 
     const swimlanes = useMemo(
-      () => buildSwimlanes(projectedProjects, swimlaneMode, initiatives, hiddenLabelIds, teams),
-      [projectedProjects, swimlaneMode, initiatives, hiddenLabelIds]
+      () => buildSwimlanes(
+        projectedProjects,
+        swimlaneMode,
+        initiatives,
+        hiddenLabelIds,
+        teams,
+        hiddenInitiativeIds,
+        swimlaneOrder
+      ),
+      [projectedProjects, swimlaneMode, initiatives, hiddenLabelIds, teams, hiddenInitiativeIds, swimlaneOrder]
     )
+
+    function handleDragStart(id: string) {
+      setDraggingId(id)
+    }
+
+    function handleDragOver(id: string) {
+      if (id !== draggingId) setDragOverId(id)
+    }
+
+    function handleDragLeave() {
+      setDragOverId(null)
+    }
+
+    function handleDrop(targetId: string) {
+      if (!draggingId || draggingId === targetId) {
+        setDraggingId(null)
+        setDragOverId(null)
+        return
+      }
+      const ids = swimlanes.map((s) => s.id)
+      const fromIdx = ids.indexOf(draggingId)
+      const toIdx = ids.indexOf(targetId)
+      if (fromIdx < 0 || toIdx < 0) return
+      const newIds = [...ids]
+      newIds.splice(fromIdx, 1)
+      newIds.splice(toIdx, 0, draggingId)
+      onSwimlaneReorder?.(swimlaneMode, newIds)
+      setDraggingId(null)
+      setDragOverId(null)
+    }
+
+    function handleDragEnd() {
+      setDraggingId(null)
+      setDragOverId(null)
+    }
 
     const totalDays = daysBetween(timelineRange.startDate, timelineRange.endDate)
     const timelineWidth = totalDays * ppd
@@ -251,7 +298,6 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
     }
 
     // ── Header rows ───────────────────────────────────────────────
-    // Cell widths use next-period start (not period end) so they exactly match grid line positions.
     const renderMajorRow = () => {
       if (headerMode === 'year') {
         return years.map((y, i) => {
@@ -277,7 +323,6 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
           )
         })
       }
-      // month and day modes: major row = months
       return months.map((m, i) => {
         const cellEnd = months[i + 1]?.startDate ?? new Date(Date.UTC(m.year, m.month, 1, 12))
         const w = daysBetween(m.startDate, cellEnd) * ppd
@@ -329,7 +374,6 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
       if (headerMode === 'month') {
         return null
       }
-      // 'day' mode: individual days
       return days.map((d, i) => (
         <div
           key={i}
@@ -340,8 +384,6 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
         </div>
       ))
     }
-
-    const showMinorRow = true
 
     // ── Grid lines in body ────────────────────────────────────────
     const majorGridDates =
@@ -354,19 +396,24 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
       : headerMode === 'month' ? months.map((m) => m.startDate)
       : []
 
-    // Week grid lines: shown in week mode, and faintly in month mode when there's enough space
     const weekGridDates =
       headerMode !== 'day' && ppd >= 3.5 ? weeks.map((w) => w.startDate) : []
 
     const dayGridDates =
       headerMode === 'day' ? days.map((d) => d.date) : []
 
+    const visibleMilestones = milestones.filter((m) => {
+      if (m.hidden) return false
+      const d = parseDate(m.date)
+      return d >= timelineRange.startDate && d <= timelineRange.endDate
+    })
+
     return (
       <div className="canvas-wrapper">
         <div className="canvas-scroll-container" ref={scrollRef}>
           <div className="canvas-inner" style={{ width: canvasWidth, minWidth: canvasWidth }}>
             {/* Sticky two-row timeline header */}
-            <div className={`timeline-header ${showMinorRow ? 'timeline-header-two-row' : ''}`}>
+            <div className="timeline-header timeline-header-two-row">
               {/* Major row */}
               <div className="timeline-header-row timeline-header-row-major">
                 <div className="swimlane-label-spacer" />
@@ -374,58 +421,61 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
                   {renderMajorRow()}
                 </div>
               </div>
-              {/* Minor row */}
-              {showMinorRow && (
-                <div className="timeline-header-row timeline-header-row-minor">
-                  <div className="swimlane-label-spacer" />
-                  <div className="header-track">
-                    {renderMinorRow()}
-                  </div>
+              {/* Minor row — milestone flag labels live here so they never overlap project bars */}
+              <div className="timeline-header-row timeline-header-row-minor">
+                <div className="swimlane-label-spacer" />
+                <div className="header-track">
+                  {renderMinorRow()}
                 </div>
-              )}
+                {visibleMilestones.map((m) => {
+                  const x = dateToX(parseDate(m.date), timelineRange.startDate, ppd) + LABEL_WIDTH + 4
+                  return (
+                    <div
+                      key={m.id}
+                      className="milestone-flag milestone-flag-header"
+                      style={{ backgroundColor: m.color, left: x }}
+                    >
+                      {m.label}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
 
             {/* Canvas body */}
             <div className="canvas-body" ref={bodyRef}>
-              {/* Major grid lines */}
               {majorGridDates.map((d, i) => {
                 const x = dateToX(d, timelineRange.startDate, ppd) + LABEL_WIDTH - 1
                 return <div key={`major-${i}`} className="quarter-gridline" style={{ left: x }} />
               })}
 
-              {/* Minor (faint) grid lines — months within quarters */}
               {minorGridDates.map((d, i) => {
                 const x = dateToX(d, timelineRange.startDate, ppd) + LABEL_WIDTH - 1
                 return <div key={`minor-${i}`} className="month-gridline" style={{ left: x }} />
               })}
 
-              {/* Week grid lines */}
               {weekGridDates.map((d, i) => {
                 const x = dateToX(d, timelineRange.startDate, ppd) + LABEL_WIDTH - 1
                 return <div key={`week-${i}`} className="week-gridline" style={{ left: x }} />
               })}
 
-              {/* Day grid lines */}
               {dayGridDates.map((d, i) => {
                 const x = dateToX(d, timelineRange.startDate, ppd) + LABEL_WIDTH - 1
                 return <div key={`day-${i}`} className="day-gridline" style={{ left: x }} />
               })}
 
-              {/* Milestone markers */}
-              {milestones.filter((m) => !m.hidden).map((m) => {
-                const milestoneDate = parseDate(m.date)
-                if (milestoneDate < timelineRange.startDate || milestoneDate > timelineRange.endDate) return null
-                return (
-                  <MilestoneMarker
-                    key={m.id}
-                    milestone={m}
-                    timelineRange={timelineRange}
-                    pixelsPerDay={ppd}
-                    canvasHeight={estimatedBodyHeight}
-                    labelOffset={LABEL_WIDTH}
-                  />
-                )
-              })}
+              {/* Milestone lines only (flags rendered in header above) */}
+              {visibleMilestones.map((m) => (
+                <MilestoneMarker
+                  key={m.id}
+                  milestone={m}
+                  timelineRange={timelineRange}
+                  pixelsPerDay={ppd}
+                  canvasHeight={estimatedBodyHeight}
+                  labelOffset={LABEL_WIDTH}
+                  showFlag={false}
+                />
+              ))}
 
               {swimlanes.map((sw) => (
                 <SwimlaneComponent
@@ -436,6 +486,13 @@ const RoadmapCanvas = forwardRef<RoadmapCanvasHandle, RoadmapCanvasProps>(
                   teams={teams}
                   swimlaneMode={swimlaneMode}
                   onProjectChange={onProjectChange}
+                  isDragging={sw.id === draggingId}
+                  isDragOver={sw.id === dragOverId}
+                  onDragStart={onSwimlaneReorder ? handleDragStart : undefined}
+                  onDragOver={onSwimlaneReorder ? handleDragOver : undefined}
+                  onDragLeave={onSwimlaneReorder ? handleDragLeave : undefined}
+                  onDrop={onSwimlaneReorder ? handleDrop : undefined}
+                  onDragEnd={onSwimlaneReorder ? handleDragEnd : undefined}
                 />
               ))}
             </div>
