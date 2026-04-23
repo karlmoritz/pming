@@ -33,7 +33,7 @@ export interface LinearProject {
   estimatedDates?: boolean
   estimatedStart?: boolean
   estimatedEnd?: boolean
-  initiative?: Initiative
+  initiatives: Initiative[]
   labels: ProjectLabel[]
   state: ProjectState
   teamIds: string[]
@@ -53,7 +53,7 @@ export interface Milestone {
 export interface PendingChange {
   projectId: string
   projectName: string
-  field: 'startDate' | 'targetDate' | 'initiativeId' | 'labelIds'
+  field: 'startDate' | 'targetDate' | 'initiativeIds' | 'labelIds' | 'teamIds'
   oldValue?: string
   newValue?: string
   displayValue?: string

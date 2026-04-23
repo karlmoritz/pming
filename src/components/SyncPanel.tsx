@@ -25,8 +25,9 @@ function fieldLabel(field: PendingChange['field']): string {
   switch (field) {
     case 'startDate': return 'Start Date'
     case 'targetDate': return 'Target Date'
-    case 'initiativeId': return 'Initiative'
+    case 'initiativeIds': return 'Initiative'
     case 'labelIds': return 'Labels'
+    case 'teamIds': return 'Teams'
     default: return field
   }
 }

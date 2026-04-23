@@ -15,8 +15,10 @@ interface ProjectBarProps {
 interface DragState {
   type: 'move' | 'resize-start' | 'resize-end'
   startX: number
+  startY: number
   originalStartDate: Date
   originalEndDate: Date
+  directionLocked: boolean
 }
 
 interface TooltipPos {
@@ -54,6 +56,7 @@ export default function ProjectBar({
   onProjectChange,
 }: ProjectBarProps) {
   const dragRef = useRef<DragState | null>(null)
+  const barRef = useRef<HTMLDivElement>(null)
   // dragOffsetPx drives left-edge movement (move + resize-start)
   // resizeOffsetPx drives right-edge movement (resize-end only)
   const [dragOffsetPx, setDragOffsetPx] = useState(0)
@@ -61,6 +64,8 @@ export default function ProjectBar({
   const [isDragging, setIsDragging] = useState(false)
   const [isSwimlaneDragging, setIsSwimlaneDragging] = useState(false)
   const swimlaneDragTargetRef = useRef<string | null>(null)
+  const swimlaneDragStartYRef = useRef<number>(0)
+  const [swimlaneDragOffsetY, setSwimlaneOffsetY] = useState(0)
   const [showTooltip, setShowTooltip] = useState(false)
   const [tooltipPos, setTooltipPos] = useState<TooltipPos>({ x: 0, y: 0 })
 
@@ -71,7 +76,7 @@ export default function ProjectBar({
   const endX = dateToX(endDate, timelineRange.startDate, pixelsPerDay)
   const barWidth = Math.max(endX - startX, 8)
 
-  const barColor = project.initiative?.color ?? project.state.color ?? '#6366f1'
+  const barColor = project.initiatives[0]?.color ?? project.state.color ?? '#6366f1'
   const isPaused = project.state.type === 'paused'
   const isCancelledOrCompleted =
     project.state.type === 'cancelled' || project.state.type === 'completed'
@@ -81,20 +86,44 @@ export default function ProjectBar({
 
     function handleMouseMove(e: MouseEvent) {
       if (!dragRef.current) return
-      const delta = e.clientX - dragRef.current.startX
-      const { type } = dragRef.current
+      const deltaX = e.clientX - dragRef.current.startX
+      const { type, directionLocked } = dragRef.current
+
+      if (!directionLocked) {
+        const deltaY = e.clientY - dragRef.current.startY
+        const THRESHOLD = 8
+        if (Math.abs(deltaY) > THRESHOLD && Math.abs(deltaY) > Math.abs(deltaX)) {
+          swimlaneDragStartYRef.current = dragRef.current.startY
+          dragRef.current = null
+          setDragOffsetPx(0)
+          setResizeOffsetPx(0)
+          setIsDragging(false)
+          setIsSwimlaneDragging(true)
+          return
+        }
+        if (Math.abs(deltaX) <= THRESHOLD) return
+        dragRef.current.directionLocked = true
+      }
+
       if (type === 'move') {
-        setDragOffsetPx(delta)
+        setDragOffsetPx(deltaX)
       } else if (type === 'resize-end') {
-        setResizeOffsetPx(Math.max(delta, -(barWidth - 8)))
+        setResizeOffsetPx(Math.max(deltaX, -(barWidth - 8)))
       } else {
         // resize-start: clamp right so bar can't collapse below 8 px
-        setDragOffsetPx(Math.min(delta, barWidth - 8))
+        setDragOffsetPx(Math.min(deltaX, barWidth - 8))
       }
     }
 
     function handleMouseUp(e: MouseEvent) {
       if (!dragRef.current) return
+      if (!dragRef.current.directionLocked) {
+        dragRef.current = null
+        setDragOffsetPx(0)
+        setResizeOffsetPx(0)
+        setIsDragging(false)
+        return
+      }
       const delta = e.clientX - dragRef.current.startX
       const { type, originalStartDate, originalEndDate } = dragRef.current
 
@@ -177,8 +206,11 @@ export default function ProjectBar({
     if (!isSwimlaneDragging) return
 
     function getSwimlaneAtPoint(x: number, y: number): { id: string; label: string } | null {
+      const bar = barRef.current
       const els = document.elementsFromPoint(x, y)
       for (const el of els) {
+        // Skip the dragged bar (visually translated, but still in source swimlane's DOM)
+        if (bar && (el === bar || bar.contains(el as Node))) continue
         const swimlaneEl = el.closest('[data-swimlane-id]') as HTMLElement | null
         if (swimlaneEl) {
           return {
@@ -190,7 +222,10 @@ export default function ProjectBar({
       return null
     }
 
+    const startY = swimlaneDragStartYRef.current
+
     function handleMouseMove(e: MouseEvent) {
+      setSwimlaneOffsetY(e.clientY - startY)
       const target = getSwimlaneAtPoint(e.clientX, e.clientY)
       const targetId = target?.id ?? null
 
@@ -224,26 +259,31 @@ export default function ProjectBar({
       if (!target || target.id === swimlaneId) return
 
       if (swimlaneMode === 'initiative') {
-        // target.id is the initiative id (or '__no_initiative__')
-        const newInitiativeId = target.id === '__no_initiative__' ? undefined : target.id
+        const shiftHeld = e.shiftKey
+        const currentIds = project.initiatives.map((i) => i.id)
+        let newIds: string[]
+        if (target.id === '__no_initiative__') {
+          newIds = []
+        } else if (shiftHeld) {
+          newIds = [...new Set([...currentIds, target.id])]
+        } else {
+          newIds = [target.id]
+        }
         onProjectChange({
           projectId: project.id,
           projectName: project.name,
-          field: 'initiativeId',
-          oldValue: project.initiative?.id,
-          newValue: newInitiativeId,
+          field: 'initiativeIds',
+          oldValue: project.initiatives.map((i) => i.name).join(', ') || '(none)',
+          newValue: newIds.join(','),
           displayValue: target.label,
         })
       } else if (swimlaneMode === 'label') {
-        // target.id is a label id (or '__no_label__')
-        // Alt+drag replaces all labels with the target label
         const shiftHeld = e.shiftKey
         const currentLabelIds = project.labels.map((l) => l.id)
         let newLabelIds: string[]
         if (target.id === '__no_label__') {
           newLabelIds = []
         } else if (shiftHeld) {
-          // Add to existing labels
           newLabelIds = [...new Set([...currentLabelIds, target.id])]
         } else {
           newLabelIds = [target.id]
@@ -252,12 +292,30 @@ export default function ProjectBar({
           projectId: project.id,
           projectName: project.name,
           field: 'labelIds',
-          oldValue: currentLabelIds.join(','),
+          oldValue: project.labels.map((l) => l.name).join(', ') || '(none)',
           newValue: newLabelIds.join(','),
           displayValue: target.label,
         })
+      } else if (swimlaneMode === 'team') {
+        const shiftHeld = e.shiftKey
+        const currentTeamIds = project.teamIds
+        let newTeamIds: string[]
+        if (shiftHeld) {
+          newTeamIds = [...new Set([...currentTeamIds, target.id])]
+        } else {
+          // Move: remove source team, add target team, keep others
+          newTeamIds = [...new Set([...currentTeamIds.filter((id) => id !== swimlaneId), target.id])]
+        }
+        const targetTeam = teams.find((t) => t.id === target.id)
+        onProjectChange({
+          projectId: project.id,
+          projectName: project.name,
+          field: 'teamIds',
+          oldValue: currentTeamIds.map((id) => teams.find((t) => t.id === id)?.name ?? id).join(', ') || '(none)',
+          newValue: newTeamIds.join(','),
+          displayValue: targetTeam?.name ?? target.label,
+        })
       }
-      // team mode: no-op (can't move between teams this way)
     }
 
     window.addEventListener('mousemove', handleMouseMove)
@@ -272,11 +330,7 @@ export default function ProjectBar({
     e.preventDefault()
     e.stopPropagation()
     setShowTooltip(false)
-    if (e.altKey) {
-      setIsSwimlaneDragging(true)
-      return
-    }
-    dragRef.current = { type: 'move', startX: e.clientX, originalStartDate: startDate, originalEndDate: endDate }
+    dragRef.current = { type: 'move', startX: e.clientX, startY: e.clientY, originalStartDate: startDate, originalEndDate: endDate, directionLocked: false }
     setIsDragging(true)
   }
 
@@ -284,7 +338,7 @@ export default function ProjectBar({
     e.preventDefault()
     e.stopPropagation()
     setShowTooltip(false)
-    dragRef.current = { type: 'resize-start', startX: e.clientX, originalStartDate: startDate, originalEndDate: endDate }
+    dragRef.current = { type: 'resize-start', startX: e.clientX, startY: e.clientY, originalStartDate: startDate, originalEndDate: endDate, directionLocked: true }
     setIsDragging(true)
   }
 
@@ -292,7 +346,7 @@ export default function ProjectBar({
     e.preventDefault()
     e.stopPropagation()
     setShowTooltip(false)
-    dragRef.current = { type: 'resize-end', startX: e.clientX, originalStartDate: startDate, originalEndDate: endDate }
+    dragRef.current = { type: 'resize-end', startX: e.clientX, startY: e.clientY, originalStartDate: startDate, originalEndDate: endDate, directionLocked: true }
     setIsDragging(true)
   }
 
@@ -340,6 +394,7 @@ export default function ProjectBar({
   return (
     <>
       <div
+        ref={barRef}
         className={`project-bar${isDragging ? ' dragging' : ''}${isSwimlaneDragging ? ' swimlane-dragging' : ''}${isBacklogEstimated ? ' estimated' : ''}`}
         style={{
           left: currentLeft,
@@ -348,6 +403,8 @@ export default function ProjectBar({
           opacity: isCancelledOrCompleted ? 0.5 : isBacklogEstimated ? 0.55 : 1,
           WebkitMaskImage: edgeMask,
           maskImage: edgeMask,
+          transform: isSwimlaneDragging ? `translateY(${swimlaneDragOffsetY}px)` : undefined,
+          zIndex: isSwimlaneDragging ? 100 : undefined,
         }}
         onMouseDown={handleBodyMouseDown}
         onMouseEnter={handleMouseEnter}
@@ -381,10 +438,10 @@ export default function ProjectBar({
           style={{ left: tooltipPos.x, top: tooltipPos.y }}
         >
           <div className="project-tooltip-title">{project.name}</div>
-          {project.initiative && (
+          {project.initiatives.length > 0 && (
             <div className="project-tooltip-row">
-              <span className="project-tooltip-label">Initiative:</span>
-              <span className="project-tooltip-value">{project.initiative.name}</span>
+              <span className="project-tooltip-label">{project.initiatives.length === 1 ? 'Initiative:' : 'Initiatives:'}</span>
+              <span className="project-tooltip-value">{project.initiatives.map((i) => i.name).join(', ')}</span>
             </div>
           )}
           {project.teamIds.length > 0 && (

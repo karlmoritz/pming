@@ -20,17 +20,19 @@ function buildByInitiative(projects: LinearProject[], _initiatives: Initiative[]
   const map = new Map<string, Swimlane>()
 
   for (const project of projects) {
-    const init = project.initiative
-    const key = init ? init.id : '__no_initiative__'
-    if (!map.has(key)) {
-      map.set(key, {
-        id: key,
-        label: init ? init.name : 'No Initiative',
-        color: init?.color,
-        projects: [],
-      })
+    if (project.initiatives.length === 0) {
+      if (!map.has('__no_initiative__')) {
+        map.set('__no_initiative__', { id: '__no_initiative__', label: 'No Initiative', color: undefined, projects: [] })
+      }
+      map.get('__no_initiative__')!.projects.push(project)
+    } else {
+      for (const init of project.initiatives) {
+        if (!map.has(init.id)) {
+          map.set(init.id, { id: init.id, label: init.name, color: init.color, projects: [] })
+        }
+        map.get(init.id)!.projects.push(project)
+      }
     }
-    map.get(key)!.projects.push(project)
   }
 
   const named: Swimlane[] = []

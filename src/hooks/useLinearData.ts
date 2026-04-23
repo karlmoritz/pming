@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { Team, Initiative, LinearProject } from '../types'
-import { fetchTeams, fetchInitiatives, fetchProjects, fetchLabelGroups } from '../api/linear'
+import { fetchTeams, fetchInitiatives, fetchProjects, fetchTeamProjects, fetchLabelGroups } from '../api/linear'
 import type { LabelGroup } from '../api/linear'
 
 interface UseLinearDataResult {
@@ -54,24 +54,29 @@ export function useLinearData(apiKey: string, selectedTeamIds: string[]): UseLin
       setLoading(true)
       setError(null)
       try {
-        const [projectsData, initiativesData, labelGroupsData] = await Promise.all([
+        const [projectsData, initiativesData, labelGroupsData, projectTeamsMap] = await Promise.all([
           fetchProjects(selectedTeamIds),
           fetchInitiatives(),
           fetchLabelGroups(),
+          fetchTeamProjects(selectedTeamIds),
         ])
 
         if (!cancelled) {
-          // Build projectId → initiative map from the initiatives' project lists
-          const projectInitiativeMap = new Map<string, Initiative>()
+          // Build projectId → Initiative[] map (a project can belong to multiple initiatives)
+          const projectInitiativesMap = new Map<string, Initiative[]>()
           for (const initiative of initiativesData) {
             for (const pid of initiative.projectIds ?? []) {
-              projectInitiativeMap.set(pid, initiative)
+              if (!projectInitiativesMap.has(pid)) projectInitiativesMap.set(pid, [])
+              projectInitiativesMap.get(pid)!.push(initiative)
             }
           }
 
           const joined = projectsData.map((p) => ({
             ...p,
-            initiative: projectInitiativeMap.get(p.id),
+            initiatives: projectInitiativesMap.get(p.id) ?? [],
+            teamIds: (projectTeamsMap.get(p.id) ?? []).filter(
+              (id) => selectedTeamIds.length === 0 || selectedTeamIds.includes(id)
+            ),
           }))
 
           setInitiatives(initiativesData)

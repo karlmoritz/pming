@@ -200,9 +200,9 @@ export async function fetchProjects(teamIds: string[] = []): Promise<LinearProje
         targetDate: p.targetDate,
         color: p.color,
         state: mapState(p.state),
-        initiative: undefined as LinearProject['initiative'],
+        initiatives: [],
         labels: p.labels.nodes.map((l) => ({ id: l.id, name: l.name, color: l.color })),
-        teamIds: teamIds,
+        teamIds: [],
       }))
 
     allProjects.push(...mapped)
@@ -211,6 +211,36 @@ export async function fetchProjects(teamIds: string[] = []): Promise<LinearProje
   }
 
   return allProjects
+}
+
+// Returns a map of projectId → teamIds[], built from the team side (same pattern as initiatives).
+export async function fetchTeamProjects(teamIds: string[]): Promise<Map<string, string[]>> {
+  if (teamIds.length === 0) return new Map()
+  const filter = teamIds.length === 1
+    ? { id: { eq: teamIds[0] } }
+    : { id: { in: teamIds } }
+  const data = await gql<{
+    teams: { nodes: Array<{ id: string; projects: { nodes: Array<{ id: string }> } }> }
+  }>(`
+    query TeamProjects($filter: TeamFilter) {
+      teams(filter: $filter) {
+        nodes {
+          id
+          projects(first: 250) {
+            nodes { id }
+          }
+        }
+      }
+    }
+  `, { filter })
+  const map = new Map<string, string[]>()
+  for (const team of data.teams.nodes) {
+    for (const project of team.projects.nodes) {
+      if (!map.has(project.id)) map.set(project.id, [])
+      map.get(project.id)!.push(team.id)
+    }
+  }
+  return map
 }
 
 export async function findOrCreateConfigProject(teamId: string): Promise<string | null> {
@@ -434,7 +464,8 @@ export async function applyChanges(
           },
         })
         applied++
-      } else if (change.field === 'initiativeId') {
+      } else if (change.field === 'initiativeIds') {
+        const ids = change.newValue ? change.newValue.split(',').filter(Boolean) : []
         try {
           await gql<{ projectUpdate: { success: boolean } }>(`
             mutation UpdateProject($id: String!, $input: ProjectUpdateInput!) {
@@ -446,13 +477,31 @@ export async function applyChanges(
           `, {
             id: change.projectId,
             input: {
-              initiativeId: change.newValue ?? null,
+              initiativeId: ids[0] ?? null,
             },
           })
           applied++
         } catch (initiativeErr) {
           console.warn('Initiative update not supported or failed:', initiativeErr)
-          // Silently skip initiative errors
+          applied++
+        }
+      } else if (change.field === 'teamIds') {
+        const ids = change.newValue ? change.newValue.split(',').filter(Boolean) : []
+        try {
+          await gql<{ projectUpdate: { success: boolean } }>(`
+            mutation UpdateProject($id: String!, $input: ProjectUpdateInput!) {
+              projectUpdate(id: $id, input: $input) {
+                success
+                project { id }
+              }
+            }
+          `, {
+            id: change.projectId,
+            input: { memberTeamIds: ids },
+          })
+          applied++
+        } catch (teamErr) {
+          console.warn('Team update not supported or failed:', teamErr)
           applied++
         }
       } else if (change.field === 'labelIds') {

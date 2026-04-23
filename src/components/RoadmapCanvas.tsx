@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, useEffect, useLayoutEffect, forwardRef, useI
 import type {
   LinearProject,
   Initiative,
+  ProjectLabel,
   SwimlaneMode,
   Milestone,
   PendingChange,
@@ -53,6 +54,12 @@ function applyPendingChanges(
   initiatives: Initiative[]
 ): LinearProject[] {
   if (pendingChanges.length === 0) return projects
+  const labelById = new Map<string, ProjectLabel>()
+  for (const p of projects) {
+    for (const l of p.labels) {
+      if (!labelById.has(l.id)) labelById.set(l.id, l)
+    }
+  }
   return projects.map((project) => {
     const changes = pendingChanges.filter((c) => c.projectId === project.id)
     if (changes.length === 0) return project
@@ -62,11 +69,17 @@ function applyPendingChanges(
         updated = { ...updated, startDate: change.newValue }
       } else if (change.field === 'targetDate') {
         updated = { ...updated, targetDate: change.newValue }
-      } else if (change.field === 'initiativeId') {
-        const initiative = change.newValue
-          ? initiatives.find((i) => i.id === change.newValue)
-          : undefined
-        updated = { ...updated, initiative }
+      } else if (change.field === 'initiativeIds') {
+        const ids = change.newValue ? change.newValue.split(',').filter(Boolean) : []
+        const inits = ids.map((id) => initiatives.find((i) => i.id === id)).filter((i): i is Initiative => !!i)
+        updated = { ...updated, initiatives: inits }
+      } else if (change.field === 'teamIds') {
+        const ids = change.newValue ? change.newValue.split(',').filter(Boolean) : []
+        updated = { ...updated, teamIds: ids }
+      } else if (change.field === 'labelIds') {
+        const ids = change.newValue ? change.newValue.split(',').filter(Boolean) : []
+        const labels = ids.map((id) => labelById.get(id)).filter((l): l is ProjectLabel => !!l)
+        updated = { ...updated, labels }
       }
     }
     return updated
