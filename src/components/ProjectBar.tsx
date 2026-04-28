@@ -122,6 +122,7 @@ export default function ProjectBar({
         setDragOffsetPx(0)
         setResizeOffsetPx(0)
         setIsDragging(false)
+        window.open(project.url, '_blank', 'noopener,noreferrer')
         return
       }
       const delta = e.clientX - dragRef.current.startX
