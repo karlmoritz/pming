@@ -1,5 +1,11 @@
 import type { LinearProject, Swimlane, SwimlaneMode, Initiative, Team } from '../types'
 
+function projectPassesLabelFilter(project: LinearProject, hiddenLabelIds: string[]): boolean {
+  if (hiddenLabelIds.length === 0) return true
+  if (project.labels.length === 0) return !hiddenLabelIds.includes('__no_label__')
+  return project.labels.some((l) => !hiddenLabelIds.includes(l.id))
+}
+
 export function buildSwimlanes(
   projects: LinearProject[],
   mode: SwimlaneMode,
@@ -11,11 +17,11 @@ export function buildSwimlanes(
 ): Swimlane[] {
   let swimlanes: Swimlane[]
   if (mode === 'initiative') {
-    swimlanes = buildByInitiative(projects, initiatives, hiddenInitiativeIds)
+    swimlanes = buildByInitiative(projects, initiatives, hiddenInitiativeIds, hiddenLabelIds)
   } else if (mode === 'label') {
     swimlanes = buildByLabel(projects, hiddenLabelIds)
   } else {
-    swimlanes = buildByTeam(projects, teams)
+    swimlanes = buildByTeam(projects, teams, hiddenLabelIds)
   }
 
   const order = swimlaneOrder?.[mode]
@@ -41,11 +47,13 @@ function applyOrder(swimlanes: Swimlane[], order: string[]): Swimlane[] {
 function buildByInitiative(
   projects: LinearProject[],
   _initiatives: Initiative[],
-  hiddenInitiativeIds: string[] = []
+  hiddenInitiativeIds: string[] = [],
+  hiddenLabelIds: string[] = []
 ): Swimlane[] {
   const map = new Map<string, Swimlane>()
 
   for (const project of projects) {
+    if (!projectPassesLabelFilter(project, hiddenLabelIds)) continue
     if (project.initiatives.length === 0) {
       if (!map.has('__no_initiative__')) {
         map.set('__no_initiative__', { id: '__no_initiative__', label: 'No Initiative', color: undefined, projects: [] })
@@ -103,10 +111,11 @@ function buildByLabel(projects: LinearProject[], hiddenLabelIds: string[]): Swim
 }
 
 // Each project appears once per team it belongs to.
-function buildByTeam(projects: LinearProject[], teams: Team[]): Swimlane[] {
+function buildByTeam(projects: LinearProject[], teams: Team[], hiddenLabelIds: string[] = []): Swimlane[] {
   const map = new Map<string, Swimlane>()
 
   for (const project of projects) {
+    if (!projectPassesLabelFilter(project, hiddenLabelIds)) continue
     for (const teamId of project.teamIds) {
       if (!map.has(teamId)) {
         const team = teams.find((t) => t.id === teamId)

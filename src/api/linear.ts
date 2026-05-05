@@ -215,9 +215,8 @@ export async function fetchProjects(teamIds: string[] = []): Promise<LinearProje
 
 // Returns a map of projectId → teamIds[], built from the team side (same pattern as initiatives).
 export async function fetchTeamProjects(teamIds: string[]): Promise<Map<string, string[]>> {
-  if (teamIds.length === 0) return new Map()
-  const filter = teamIds.length === 1
-    ? { id: { eq: teamIds[0] } }
+  const filter = teamIds.length === 0 ? undefined
+    : teamIds.length === 1 ? { id: { eq: teamIds[0] } }
     : { id: { in: teamIds } }
   const data = await gql<{
     teams: { nodes: Array<{ id: string; projects: { nodes: Array<{ id: string }> } }> }

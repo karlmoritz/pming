@@ -136,6 +136,27 @@ export default function Toolbar({
 
       <div className="toolbar-divider" />
 
+      <div className="swimlane-toggle">
+        <button
+          className={currentMode === 'initiative' ? 'active' : ''}
+          onClick={() => onSwimlaneModeChange('initiative')}
+        >
+          By Initiative
+        </button>
+        <button
+          className={currentMode === 'label' ? 'active' : ''}
+          onClick={() => onSwimlaneModeChange('label')}
+        >
+          By Label
+        </button>
+        <button
+          className={currentMode === 'team' ? 'active' : ''}
+          onClick={() => onSwimlaneModeChange('team')}
+        >
+          By Team
+        </button>
+      </div>
+
       <div className="label-filter-wrap" ref={teamDropRef}>
         <button
           className={selectedTeamIds.length > 0 ? 'primary' : ''}
@@ -173,62 +194,31 @@ export default function Toolbar({
         )}
       </div>
 
-      <div className="toolbar-divider" />
-
-      <div className="swimlane-toggle">
-        <button
-          className={currentMode === 'initiative' ? 'active' : ''}
-          onClick={() => onSwimlaneModeChange('initiative')}
-        >
-          By Initiative
-        </button>
-        <button
-          className={currentMode === 'label' ? 'active' : ''}
-          onClick={() => onSwimlaneModeChange('label')}
-        >
-          By Label
-        </button>
-        <button
-          className={currentMode === 'team' ? 'active' : ''}
-          onClick={() => onSwimlaneModeChange('team')}
-        >
-          By Team
-        </button>
-      </div>
-
-      {/* Initiative filter — only visible in initiative mode */}
-      {currentMode === 'initiative' && allInitiatives.length > 0 && (
-        <>
-          <div className="toolbar-divider" />
-          <LabelFilterDropdown
-            labels={allInitiatives}
-            labelGroups={[]}
-            hiddenLabelIds={hiddenInitiativeIds}
-            onToggle={onToggleInitiative}
-            onToggleGroup={() => {}}
-            onShowAll={onShowAllInitiatives}
-            onHideAll={onHideAllInitiatives}
-            title="Initiative Swimlanes"
-            buttonLabel="Initiatives"
-          />
-        </>
+      {allInitiatives.length > 0 && (
+        <LabelFilterDropdown
+          labels={allInitiatives}
+          labelGroups={[]}
+          hiddenLabelIds={hiddenInitiativeIds}
+          onToggle={onToggleInitiative}
+          onToggleGroup={() => {}}
+          onShowAll={onShowAllInitiatives}
+          onHideAll={onHideAllInitiatives}
+          title="Initiative Swimlanes"
+          buttonLabel="Initiatives"
+        />
       )}
 
-      {/* Label filter — only visible in label mode */}
-      {currentMode === 'label' && (
-        <>
-          <div className="toolbar-divider" />
-          <LabelFilterDropdown
-            labels={allLabels}
-            labelGroups={labelGroups}
-            hiddenLabelIds={hiddenLabelIds}
-            onToggle={onToggleLabel}
-            onToggleGroup={onToggleGroup}
-            onShowAll={onShowAllLabels}
-            onHideAll={onHideAllLabels}
-          />
-        </>
-      )}
+      <LabelFilterDropdown
+        labels={allLabels}
+        labelGroups={labelGroups}
+        hiddenLabelIds={hiddenLabelIds}
+        onToggle={onToggleLabel}
+        onToggleGroup={onToggleGroup}
+        onShowAll={onShowAllLabels}
+        onHideAll={onHideAllLabels}
+        title={currentMode === 'label' ? 'Label Swimlanes' : 'Filter by Label'}
+        buttonLabel="Labels"
+      />
 
       <div className="toolbar-divider" />
 
